@@ -1,0 +1,13 @@
+{
+	"admin/services/vocat": {
+		"title": "VoCat",
+		"order": 60,
+		"action": {
+			"type": "view",
+			"path": "vocat/index"
+		},
+		"depends": {
+			"acl": [ "luci-app-vocat" ]
+		}
+	}
+}

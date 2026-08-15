@@ -1,0 +1,19 @@
+{
+	"luci-app-vocat": {
+		"description": "Grant access to VoCat LuCI app",
+		"read": {
+			"uci": [ "vocat" ],
+			"file": {
+				"/usr/share/vocat/status.sh": [ "exec" ],
+				"/usr/share/vocat/device_probe.sh": [ "exec" ]
+			}
+		},
+		"write": {
+			"uci": [ "vocat" ],
+			"file": {
+				"/usr/share/vocat/service.sh": [ "exec" ],
+				"/usr/share/vocat/apply_config.sh": [ "exec" ]
+			}
+		}
+	}
+}

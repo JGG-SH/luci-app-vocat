@@ -1,0 +1,19 @@
+# 强制关键文件使用 LF，避免 Windows CRLF 破坏路由器上的 shebang / 脚本解析
+* text=auto
+
+# shell 脚本、init 脚本、OpenWrt 配置、Makefile 一律 LF
+*.sh text eol=lf
+*.init text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+etc/config/* text eol=lf
+etc/init.d/* text eol=lf
+*.json text eol=lf
+*.js text eol=lf
+version text eol=lf
+arch text eol=lf
+
+# 二进制不转换
+*.aarch64 binary
+*.amd64 binary
+*.armv7 binary
