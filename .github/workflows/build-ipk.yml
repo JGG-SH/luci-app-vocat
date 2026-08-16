@@ -28,10 +28,10 @@ on:
         required: true
         type: choice
         options:
-          - '25.12.5'    # 最新稳定版 (推荐)
-          - '24.10.8'    # 长期支持版
-          - '23.05.6'    # 旧稳定版
-          - 'snapshot'   # 开发快照版
+          - '25.12.5'
+          - '24.10.8'
+          - '23.05.6'
+          - 'snapshot'
       version:
         description: '界面版本号 (留空则自动从 Git Tag 获取)'
         required: false
@@ -53,22 +53,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 检查并提醒 OpenWrt 最新版本
-        id: check_release
-        run: |
-          echo "正在检查 OpenWrt 官方最新稳定版..."
-          LATEST=$(curl -s \
-            --header 'Accept: application/vnd.github+json' \
-            https://api.github.com/repos/openwrt/openwrt/releases?per_page=100 \
-            | jq -r '[.[] | select(.tag_name | contains("rc") | not)] | .[0].tag_name')
-          SELECTED="${{ github.event.inputs.release }}"
-          echo "您选择的版本: $SELECTED"
-          echo "OpenWrt 官方最新稳定版: $LATEST"
-          if [ -n "$LATEST" ] && [ "$SELECTED" != "$LATEST" ] && [ "$SELECTED" != "snapshot" ]; then
-            echo "::warning title=版本更新可用::您选择的 $SELECTED 不是最新版本，建议使用 $LATEST"
-          fi
-          echo "selected_release=${SELECTED}" >> $GITHUB_OUTPUT
-
       - name: 确定界面版本号
         id: version
         run: |
@@ -86,7 +70,7 @@ jobs:
         id: sdk
         run: |
           TARGET="${{ github.event.inputs.target }}"
-          RELEASE="${{ steps.check_release.outputs.selected_release }}"
+          RELEASE="${{ github.event.inputs.release }}"
           echo "目标平台: $TARGET"
           echo "OpenWrt 版本: $RELEASE"
           if [ "$RELEASE" = "snapshot" ]; then
@@ -142,5 +126,5 @@ jobs:
             - 界面版本: ${{ steps.version.outputs.version }}
             - 核心版本: 编译时从 JGG-SH/VoCat 自动获取最新
             - 目标平台: ${{ github.event.inputs.target }}
-            - OpenWrt 版本: ${{ steps.check_release.outputs.selected_release }}
+            - OpenWrt 版本: ${{ github.event.inputs.release }}
           files: ./*.ipk
