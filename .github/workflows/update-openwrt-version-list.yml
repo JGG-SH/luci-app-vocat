@@ -1,0 +1,79 @@
+name: Update OpenWrt Version List
+
+on:
+  schedule:
+    - cron: '0 0,12 * * *'   # 每天 UTC 0:00 和 12:00 运行（北京时间 8:00 和 20:00）
+  workflow_dispatch:         # 也支持手动触发
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout 仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 获取 OpenWrt 最新稳定版列表（前5个，不含 rc）
+        id: get_releases
+        run: |
+          RELEASES=$(curl -s \
+            --header 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/openwrt/openwrt/releases?per_page=100 \
+            | jq -r '[.[] | select(.tag_name | contains("rc") | not)] | .[0:5] | .[].tag_name')
+          echo "releases<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 更新 build-ipk.yml 和 build-apk.yml 中的 options
+        run: |
+          RELEASES="${{ steps.get_releases.outputs.releases }}"
+          if [ -z "$RELEASES" ]; then
+            echo "未获取到版本列表，退出"
+            exit 1
+          fi
+
+          # 转换为 YAML 数组格式（缩进10个空格）
+          YAML_LIST=""
+          while IFS= read -r ver; do
+            [ -z "$ver" ] && continue
+            YAML_LIST="${YAML_LIST}          - '$ver'\n"
+          done <<< "$RELEASES"
+          # 追加 snapshot 作为最后一个选项
+          YAML_LIST="${YAML_LIST}          - 'snapshot'"
+
+          # 更新 build-ipk.yml 中的 release 块
+          sed -i "/^      release:/,/^      version:/c\\
+      release:\n\
+        description: 'OpenWrt 版本'\n\
+        required: true\n\
+        type: choice\n\
+        options:\n\
+$(echo -e "$YAML_LIST")\n\
+      version:" .github/workflows/build-ipk.yml
+
+          # 更新 build-apk.yml 中的 release 块
+          sed -i "/^      release:/,/^      version:/c\\
+      release:\n\
+        description: 'OpenWrt 版本'\n\
+        required: true\n\
+        type: choice\n\
+        options:\n\
+$(echo -e "$YAML_LIST")\n\
+      version:" .github/workflows/build-apk.yml
+
+      - name: 提交并推送更新（如果有变更）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/build-ipk.yml .github/workflows/build-apk.yml
+          if git diff --cached --quiet; then
+            echo "没有变更，无需提交"
+          else
+            git commit -m "chore: 自动更新 OpenWrt 版本列表 [skip ci]"
+            git push
+          fi
