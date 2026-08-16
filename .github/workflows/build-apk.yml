@@ -1,0 +1,87 @@
+name: Build APK Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '界面版本号 (留空则自动从 Git Tag 获取)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout luci-app-vocat 源码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 确定界面版本号
+      - name: 确定版本号
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "界面版本: ${VERSION}"
+
+      # 下载 OpenWrt SDK (快照版, 启用 APK 支持)
+      - name: 下载 SDK
+        run: |
+          SDK_URL="https://downloads.openwrt.org/snapshots/targets/qualcommax/ipq60xx/openwrt-sdk-qualcommax-ipq60xx_gcc-13.3.0_musl.Linux-x86_64.tar.xz"
+          wget -O sdk.tar.xz $SDK_URL
+          tar -xf sdk.tar.xz
+          mv openwrt-sdk-* sdk
+
+      # 将源码复制到 SDK 的 package 目录, 并设置界面版本号
+      - name: 准备编译环境 (启用 APK)
+        run: |
+          cp -r . sdk/package/luci-app-vocat
+          cd sdk
+          # 启用 APK 支持
+          echo "CONFIG_USE_APK=y" >> .config
+          if [ -f package/luci-app-vocat/Makefile ]; then
+            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${{ steps.version.outputs.version }}/" package/luci-app-vocat/Makefile
+          fi
+          make defconfig
+
+      # 编译 vocat-core 和 luci-app-vocat
+      - name: 编译 APK
+        run: |
+          cd sdk
+          make package/luci-app-vocat/compile V=s
+          # 查找生成的 apk 文件
+          find bin/ -name "*.apk" -exec cp {} ../ \;
+
+      # 上传 APK 作为 Artifact
+      - name: 上传 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocat-luci-${{ steps.version.outputs.version }}-arm64.apk
+          path: ./*.apk
+
+      # 如果是 Tag 触发, 创建 Release 并上传 APK
+      - name: 创建 Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "luci-app-vocat v${{ steps.version.outputs.version }} (APK)"
+          body: |
+            ## luci-app-vocat v${{ steps.version.outputs.version }}
+            - 界面版本: ${{ steps.version.outputs.version }}
+            - 核心版本: 编译时从 JGG-SH/VoCat 自动获取最新
+            - 架构: arm64 (适用于 IPQ60xx 设备)
+            - 适用于 apk 系统 (OpenWrt 24.xx / 快照版)
+          files: ./*.apk
