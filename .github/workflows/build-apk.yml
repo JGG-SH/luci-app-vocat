@@ -91,7 +91,9 @@ jobs:
 
       - name: 准备编译环境 (启用 APK)
         run: |
-          cp -r . sdk/package/luci-app-vocat
+          mkdir -p sdk/package/luci-app-vocat
+          # 使用 rsync 排除 sdk 目录，避免循环复制
+          rsync -av --exclude='sdk' ./ sdk/package/luci-app-vocat/
           cd sdk
           echo "CONFIG_USE_APK=y" >> .config
           if [ -f package/luci-app-vocat/Makefile ]; then
