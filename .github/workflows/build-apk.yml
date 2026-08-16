@@ -9,25 +9,29 @@ on:
         type: choice
         options:
           # --- arm64 架构 (AArch64) ---
-          - 'qualcommax/ipq60xx'      # 高通 IPQ60xx 系列 (IPQ6000/6010/6018/8074)
-          - 'qualcommax/ipq807x'      # 高通 IPQ807x 系列 (IPQ8074/8072)
-          - 'mediatek/filogic'        # 联发科 Filogic 系列 (MT7981/MT7986)
+          - 'qualcommax/ipq60xx'      # 高通 IPQ60xx 系列
+          - 'qualcommax/ipq807x'      # 高通 IPQ807x 系列
+          - 'mediatek/filogic'        # 联发科 Filogic 系列
           - 'mediatek/mt7622'         # 联发科 MT7622 系列
-          - 'rockchip/armv8'          # 瑞芯微 ARMv8 系列 (RK3328/RK3399)
+          - 'rockchip/armv8'          # 瑞芯微 ARMv8 系列
           - 'bcm27xx/bcm2711'         # 树莓派 4B / CM4
           # --- armv7 架构 (32位 ARM) ---
-          - 'ipq40xx/generic'         # 高通 IPQ40xx 系列 (IPQ4018/4028/4019)
+          - 'ipq40xx/generic'         # 高通 IPQ40xx 系列
           - 'bcm53xx/generic'         # 博通 BCM53xx 系列
           - 'bcm27xx/bcm2709'         # 树莓派 2B / 3B
           # --- amd64 架构 (64位 x86) ---
           - 'x86/64'                  # 64位 x86 软路由
           # --- 386 架构 (32位 x86) ---
-          - 'x86/generic'             # 32位 x86 软路由 (旧设备)
+          - 'x86/generic'             # 32位 x86 软路由
       release:
-        description: 'OpenWrt 版本 (例如: 25.12.5, 24.10.8, snapshot，留空则自动使用最新稳定版)'
-        required: false
-        type: string
-        default: ''
+        description: 'OpenWrt 版本'
+        required: true
+        type: choice
+        options:
+          - '25.12.5'    # 最新稳定版 (推荐)
+          - '24.10.8'    # 长期支持版
+          - '23.05.6'    # 旧稳定版
+          - 'snapshot'   # 开发快照版
       version:
         description: '界面版本号 (留空则自动从 Git Tag 获取)'
         required: false
@@ -49,27 +53,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 获取可用 OpenWrt 版本列表 (来自 GitHub API)
-        id: get_releases
+      - name: 检查并提醒 OpenWrt 最新版本
+        id: check_release
         run: |
-          echo "正在从 OpenWrt 官方仓库获取最新稳定版列表..."
-          RELEASES=$(curl -s \
+          echo "正在检查 OpenWrt 官方最新稳定版..."
+          LATEST=$(curl -s \
             --header 'Accept: application/vnd.github+json' \
             https://api.github.com/repos/openwrt/openwrt/releases?per_page=100 \
-            | jq -r '.[].tag_name' \
-            | grep -v 'rc' \
-            | head -10)
-          echo "可用稳定版:"
-          echo "$RELEASES"
-          # 提取最新版本 (第一个)
-          LATEST=$(echo "$RELEASES" | head -1)
-          echo "latest_release=${LATEST}" >> $GITHUB_OUTPUT
-          # 保存完整列表供参考
-          echo "releases_list<<EOF" >> $GITHUB_OUTPUT
-          echo "$RELEASES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+            | jq -r '[.[] | select(.tag_name | contains("rc") | not)] | .[0].tag_name')
+          SELECTED="${{ github.event.inputs.release }}"
+          echo "您选择的版本: $SELECTED"
+          echo "OpenWrt 官方最新稳定版: $LATEST"
+          if [ -n "$LATEST" ] && [ "$SELECTED" != "$LATEST" ] && [ "$SELECTED" != "snapshot" ]; then
+            echo "::warning title=版本更新可用::您选择的 $SELECTED 不是最新版本，建议使用 $LATEST"
+          fi
+          echo "selected_release=${SELECTED}" >> $GITHUB_OUTPUT
 
-      - name: 确定版本号
+      - name: 确定界面版本号
         id: version
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
@@ -82,29 +82,11 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "界面版本: ${VERSION}"
 
-      - name: 确定 OpenWrt 发行版本
-        id: openwrt_version
-        run: |
-          USER_INPUT="${{ github.event.inputs.release }}"
-          if [ -n "$USER_INPUT" ]; then
-            echo "用户指定版本: $USER_INPUT"
-            echo "openwrt_release=${USER_INPUT}" >> $GITHUB_OUTPUT
-          else
-            LATEST="${{ steps.get_releases.outputs.latest_release }}"
-            if [ -n "$LATEST" ]; then
-              echo "未指定版本，自动使用最新稳定版: $LATEST"
-              echo "openwrt_release=${LATEST}" >> $GITHUB_OUTPUT
-            else
-              echo "警告: 无法获取最新版本，使用默认 25.12.5"
-              echo "openwrt_release=25.12.5" >> $GITHUB_OUTPUT
-            fi
-          fi
-
       - name: 下载 SDK
         id: sdk
         run: |
           TARGET="${{ github.event.inputs.target }}"
-          RELEASE="${{ steps.openwrt_version.outputs.openwrt_release }}"
+          RELEASE="${{ steps.check_release.outputs.selected_release }}"
           echo "目标平台: $TARGET"
           echo "OpenWrt 版本: $RELEASE"
           if [ "$RELEASE" = "snapshot" ]; then
@@ -116,8 +98,7 @@ jobs:
           SDK_FILE=$(wget -q -O - "$BASE_URL" | grep -oP 'openwrt-sdk-[^"]*\.tar\.(xz|zst)' | head -1)
           if [ -z "$SDK_FILE" ]; then
             echo "错误: 无法从 $BASE_URL 获取 SDK 文件，请检查 target 和 release 是否正确"
-            echo "提示: 可用版本列表如下:"
-            echo "${{ steps.get_releases.outputs.releases_list }}"
+            echo "提示: 尝试使用 snapshot 或更新版本"
             exit 1
           fi
           echo "找到 SDK: $SDK_FILE"
@@ -132,7 +113,6 @@ jobs:
       - name: 准备编译环境 (启用 APK)
         run: |
           mkdir -p sdk/package/luci-app-vocat
-          # 使用 rsync 排除 sdk 目录，避免循环复制
           rsync -av --exclude='sdk' ./ sdk/package/luci-app-vocat/
           cd sdk
           echo "CONFIG_USE_APK=y" >> .config
@@ -163,5 +143,5 @@ jobs:
             - 界面版本: ${{ steps.version.outputs.version }}
             - 核心版本: 编译时从 JGG-SH/VoCat 自动获取最新
             - 目标平台: ${{ github.event.inputs.target }}
-            - OpenWrt 版本: ${{ steps.openwrt_version.outputs.openwrt_release }}
+            - OpenWrt 版本: ${{ steps.check_release.outputs.selected_release }}
           files: ./*.apk
