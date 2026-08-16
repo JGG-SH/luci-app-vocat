@@ -12,13 +12,13 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout 仓库
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 获取 OpenWrt 最新稳定版列表（前5个，不含 rc）
+      - name: Fetch latest OpenWrt stable releases (top 5, exclude rc)
         id: get_releases
         run: |
           RELEASES=$(curl -s \
@@ -29,14 +29,15 @@ jobs:
           echo "$RELEASES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: 更新 build-ipk.yml 和 build-apk.yml 中的 options
+      - name: Update options in build-ipk.yml and build-apk.yml
         run: |
           RELEASES="${{ steps.get_releases.outputs.releases }}"
           if [ -z "$RELEASES" ]; then
-            echo "未获取到版本列表，退出"
+            echo "Failed to fetch release list, exiting."
             exit 1
           fi
 
+          # Build YAML array (10 spaces indent, matching existing options)
           YAML_LIST=""
           while IFS= read -r ver; do
             [ -z "$ver" ] && continue
@@ -44,32 +45,34 @@ jobs:
           done <<< "$RELEASES"
           YAML_LIST="${YAML_LIST}          - 'snapshot'"
 
+          # Update build-ipk.yml
           sed -i "/^      release:/,/^      version:/c\\
       release:\n\
-        description: 'OpenWrt 版本'\n\
+        description: 'OpenWrt version'\n\
         required: true\n\
         type: choice\n\
         options:\n\
 $(echo -e "$YAML_LIST")\n\
       version:" .github/workflows/build-ipk.yml
 
+          # Update build-apk.yml
           sed -i "/^      release:/,/^      version:/c\\
       release:\n\
-        description: 'OpenWrt 版本'\n\
+        description: 'OpenWrt version'\n\
         required: true\n\
         type: choice\n\
         options:\n\
 $(echo -e "$YAML_LIST")\n\
       version:" .github/workflows/build-apk.yml
 
-      - name: 提交并推送更新（如果有变更）
+      - name: Commit and push changes (if any)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .github/workflows/build-ipk.yml .github/workflows/build-apk.yml
           if git diff --cached --quiet; then
-            echo "没有变更，无需提交"
+            echo "No changes, skipping commit."
           else
-            git commit -m "chore: 自动更新 OpenWrt 版本列表 [skip ci]"
+            git commit -m "chore: auto update OpenWrt version list [skip ci]"
             git push
           fi
