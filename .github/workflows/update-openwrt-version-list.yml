@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      workflows: write   # 允许修改 .github/workflows/* 文件
 
     steps:
       - name: Checkout repository
