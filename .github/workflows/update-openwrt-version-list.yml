@@ -2,8 +2,8 @@ name: Update OpenWrt Version List
 
 on:
   schedule:
-    - cron: '0 0,12 * * *'   # 每天 UTC 0:00 和 12:00 运行（北京时间 8:00 和 20:00）
-  workflow_dispatch:         # 也支持手动触发
+    - cron: '0 0,12 * * *'
+  workflow_dispatch:
 
 jobs:
   update:
@@ -37,16 +37,13 @@ jobs:
             exit 1
           fi
 
-          # 转换为 YAML 数组格式（缩进10个空格）
           YAML_LIST=""
           while IFS= read -r ver; do
             [ -z "$ver" ] && continue
             YAML_LIST="${YAML_LIST}          - '$ver'\n"
           done <<< "$RELEASES"
-          # 追加 snapshot 作为最后一个选项
           YAML_LIST="${YAML_LIST}          - 'snapshot'"
 
-          # 更新 build-ipk.yml 中的 release 块
           sed -i "/^      release:/,/^      version:/c\\
       release:\n\
         description: 'OpenWrt 版本'\n\
@@ -56,7 +53,6 @@ jobs:
 $(echo -e "$YAML_LIST")\n\
       version:" .github/workflows/build-ipk.yml
 
-          # 更新 build-apk.yml 中的 release 块
           sed -i "/^      release:/,/^      version:/c\\
       release:\n\
         description: 'OpenWrt 版本'\n\
