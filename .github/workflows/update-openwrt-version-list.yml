@@ -29,41 +29,18 @@ jobs:
           echo "$RELEASES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Update options in build-ipk.yml and build-apk.yml
+      - name: Update release options in build-ipk.yml and build-apk.yml
         run: |
           RELEASES="${{ steps.get_releases.outputs.releases }}"
           if [ -z "$RELEASES" ]; then
             echo "Failed to fetch release list, exiting."
             exit 1
           fi
-
-          # Build YAML array (10 spaces indent, matching existing options)
-          YAML_LIST=""
-          while IFS= read -r ver; do
-            [ -z "$ver" ] && continue
-            YAML_LIST="${YAML_LIST}          - '$ver'\n"
-          done <<< "$RELEASES"
-          YAML_LIST="${YAML_LIST}          - 'snapshot'"
-
-          # Update build-ipk.yml
-          sed -i "/^      release:/,/^      version:/c\\
-      release:\n\
-        description: 'OpenWrt version'\n\
-        required: true\n\
-        type: choice\n\
-        options:\n\
-$(echo -e "$YAML_LIST")\n\
-      version:" .github/workflows/build-ipk.yml
-
-          # Update build-apk.yml
-          sed -i "/^      release:/,/^      version:/c\\
-      release:\n\
-        description: 'OpenWrt version'\n\
-        required: true\n\
-        type: choice\n\
-        options:\n\
-$(echo -e "$YAML_LIST")\n\
-      version:" .github/workflows/build-apk.yml
+          # Build JSON array from release list, append 'snapshot'
+          JSON_ARRAY=$(echo "$RELEASES" | jq -R -s -c 'split("\n")[:-1] | . + ["snapshot"]')
+          # Update both YAML files using yq
+          yq eval -i '.on.workflow_dispatch.inputs.release.options = '"$JSON_ARRAY" .github/workflows/build-ipk.yml
+          yq eval -i '.on.workflow_dispatch.inputs.release.options = '"$JSON_ARRAY" .github/workflows/build-apk.yml
 
       - name: Commit and push changes (if any)
         run: |
