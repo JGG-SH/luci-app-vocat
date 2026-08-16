@@ -8,21 +8,17 @@ on:
         required: true
         type: choice
         options:
-          # --- arm64 架构 (AArch64) ---
-          - 'qualcommax/ipq60xx'      # 高通 IPQ60xx 系列
-          - 'qualcommax/ipq807x'      # 高通 IPQ807x 系列
-          - 'mediatek/filogic'        # 联发科 Filogic 系列
-          - 'mediatek/mt7622'         # 联发科 MT7622 系列
-          - 'rockchip/armv8'          # 瑞芯微 ARMv8 系列
-          - 'bcm27xx/bcm2711'         # 树莓派 4B / CM4
-          # --- armv7 架构 (32位 ARM) ---
-          - 'ipq40xx/generic'         # 高通 IPQ40xx 系列
-          - 'bcm53xx/generic'         # 博通 BCM53xx 系列
-          - 'bcm27xx/bcm2709'         # 树莓派 2B / 3B
-          # --- amd64 架构 (64位 x86) ---
-          - 'x86/64'                  # 64位 x86 软路由
-          # --- 386 架构 (32位 x86) ---
-          - 'x86/generic'             # 32位 x86 软路由
+          - 'qualcommax/ipq60xx'
+          - 'qualcommax/ipq807x'
+          - 'mediatek/filogic'
+          - 'mediatek/mt7622'
+          - 'rockchip/armv8'
+          - 'bcm27xx/bcm2711'
+          - 'ipq40xx/generic'
+          - 'bcm53xx/generic'
+          - 'bcm27xx/bcm2709'
+          - 'x86/64'
+          - 'x86/generic'
       release:
         description: 'OpenWrt 版本'
         required: true
@@ -32,11 +28,6 @@ on:
           - '24.10.8'
           - '23.05.6'
           - 'snapshot'
-      version:
-        description: '界面版本号 (留空则自动从 Git Tag 获取)'
-        required: false
-        default: ''
-        type: string
   push:
     tags:
       - 'v*'
@@ -53,18 +44,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 确定界面版本号
+      - name: 确定界面版本号和安全 target 名称
         id: version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
           else
             VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "界面版本: ${VERSION}"
+          
+          # 将 target 中的 / 替换为 -，用于 artifact 名称
+          SAFE_TARGET=$(echo "${{ github.event.inputs.target }}" | sed 's|/|-|g')
+          echo "safe_target=${SAFE_TARGET}" >> $GITHUB_OUTPUT
+          echo "安全 target: ${SAFE_TARGET}"
 
       - name: 下载 SDK
         id: sdk
@@ -114,7 +108,7 @@ jobs:
       - name: 上传 Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vocat-luci-${{ steps.version.outputs.version }}-${{ github.event.inputs.target }}-apk
+          name: vocat-luci-${{ steps.version.outputs.version }}-${{ steps.version.outputs.safe_target }}-apk
           path: ./*.apk
 
       - name: 创建 Release
