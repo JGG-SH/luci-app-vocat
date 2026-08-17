@@ -44,21 +44,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 确定界面版本号和安全 target 名称
+      - name: 读取界面版本号（从 Makefile）
         id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/}"
-          else
-            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
-          fi
+          # 从 Makefile 读取 PKG_VERSION 和 PKG_RELEASE，拼接成完整版本号
+          PKG_VERSION=$(grep "^PKG_VERSION" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
+          PKG_RELEASE=$(grep "^PKG_RELEASE" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
+          VERSION="${PKG_VERSION}-r${PKG_RELEASE}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "界面版本: ${VERSION}"
           
-          # 将 target 中的 / 替换为 -，用于 artifact 名称
           SAFE_TARGET=$(echo "${{ github.event.inputs.target }}" | sed 's|/|-|g')
           echo "safe_target=${SAFE_TARGET}" >> $GITHUB_OUTPUT
-          echo "安全 target: ${SAFE_TARGET}"
 
       - name: 下载 SDK
         id: sdk
@@ -93,9 +90,7 @@ jobs:
           mkdir -p sdk/package/luci-app-vocat
           rsync -av --exclude='sdk' ./ sdk/package/luci-app-vocat/
           cd sdk
-          if [ -f package/luci-app-vocat/Makefile ]; then
-            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${{ steps.version.outputs.version }}/" package/luci-app-vocat/Makefile
-          fi
+          # 无需再 sed 修改版本号，因为直接从 Makefile 读取
           make defconfig
 
       - name: 编译 IPK
@@ -114,9 +109,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          name: "luci-app-vocat v${{ steps.version.outputs.version }} (IPK) for ${{ github.event.inputs.target }}"
+          name: "luci-app-vocat ${{ steps.version.outputs.version }} (IPK) for ${{ github.event.inputs.target }}"
           body: |
-            ## luci-app-vocat v${{ steps.version.outputs.version }}
+            ## luci-app-vocat ${{ steps.version.outputs.version }}
             - 界面版本: ${{ steps.version.outputs.version }}
             - 核心版本: 编译时从 JGG-SH/VoCat 自动获取最新
             - 目标平台: ${{ github.event.inputs.target }}
