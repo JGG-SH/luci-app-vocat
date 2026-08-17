@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-vocat
-PKG_VERSION:=0.1
-PKG_RELEASE:=1
+PKG_VERSION:=$(shell date +%Y.%m.%d)
+PKG_RELEASE:=$(shell date +%H%M%S)
 PKG_LICENSE:=GPL-3.0
 PKG_MAINTAINER:=JGG-SH
 PKGARCH:=all
