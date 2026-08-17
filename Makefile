@@ -14,7 +14,7 @@ define Package/luci-app-vocat
   CATEGORY:=LuCI
   SUBMENU:=3. Applications
   TITLE:=LuCI support for VoCat
-  DEPENDS:= +luci-base +rpcd +rpcd-mod-file +curl +ca-bundle +jsonfilter
+  DEPENDS:=+luci-base +rpcd +rpcd-mod-file +curl +ca-bundle +jsonfilter
   PKGARCH:=all
 endef
 
