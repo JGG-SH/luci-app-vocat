@@ -47,7 +47,6 @@ jobs:
       - name: 读取界面版本号（从 Makefile）
         id: version
         run: |
-          # 从 Makefile 读取 PKG_VERSION 和 PKG_RELEASE，拼接成完整版本号
           PKG_VERSION=$(grep "^PKG_VERSION" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
           PKG_RELEASE=$(grep "^PKG_RELEASE" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
           VERSION="${PKG_VERSION}-r${PKG_RELEASE}"
@@ -72,8 +71,7 @@ jobs:
           echo "SDK 目录: $BASE_URL"
           SDK_FILE=$(wget -q -O - "$BASE_URL" | grep -oP 'openwrt-sdk-[^"]*\.tar\.(xz|zst)' | head -1)
           if [ -z "$SDK_FILE" ]; then
-            echo "错误: 无法从 $BASE_URL 获取 SDK 文件，请检查 target 和 release 是否正确"
-            echo "提示: 尝试使用 snapshot 或更新版本"
+            echo "错误: 无法从 $BASE_URL 获取 SDK 文件"
             exit 1
           fi
           echo "找到 SDK: $SDK_FILE"
@@ -90,7 +88,6 @@ jobs:
           mkdir -p sdk/package/luci-app-vocat
           rsync -av --exclude='sdk' ./ sdk/package/luci-app-vocat/
           cd sdk
-          # 无需再 sed 修改版本号，因为直接从 Makefile 读取
           make defconfig
 
       - name: 编译 IPK
@@ -102,7 +99,7 @@ jobs:
       - name: 上传 Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vocat-luci-${{ steps.version.outputs.version }}-${{ steps.version.outputs.safe_target }}-ipk
+          name: luci-app-vocat-${{ steps.version.outputs.version }}-${{ steps.version.outputs.safe_target }}-ipk
           path: ./*.ipk
 
       - name: 创建 Release
@@ -112,8 +109,8 @@ jobs:
           name: "luci-app-vocat ${{ steps.version.outputs.version }} (IPK) for ${{ github.event.inputs.target }}"
           body: |
             ## luci-app-vocat ${{ steps.version.outputs.version }}
-            - 界面版本: ${{ steps.version.outputs.version }}
-            - 核心版本: 编译时从 JGG-SH/VoCat 自动获取最新
+            - 版本: ${{ steps.version.outputs.version }}
             - 目标平台: ${{ github.event.inputs.target }}
             - OpenWrt 版本: ${{ github.event.inputs.release }}
+            - 注意: 此包仅包含 LuCI 界面，需单独安装 vocat-core
           files: ./*.ipk
