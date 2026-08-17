@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-vocat
-PKG_VERSION?=0.1.16
+PKG_VERSION:=0.1
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL-3.0
 PKG_MAINTAINER:=JGG-SH
@@ -14,7 +14,7 @@ define Package/luci-app-vocat
   CATEGORY:=LuCI
   SUBMENU:=3. Applications
   TITLE:=LuCI support for VoCat
-  DEPENDS:=+luci-base +rpcd +rpcd-mod-file +curl +ca-bundle +jsonfilter
+  DEPENDS:=+vocat-core +luci-base +rpcd +rpcd-mod-file +curl +ca-bundle +jsonfilter
   PKGARCH:=all
 endef
 
