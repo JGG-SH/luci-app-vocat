@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-vocat
-PKG_VERSION:=$(shell date +%Y.%m.%d)
-PKG_RELEASE:=$(shell date +%H%M%S)
+PKG_VERSION:=0.1
+PKG_RELEASE:=$(COMMITCOUNT)
 PKG_LICENSE:=GPL-3.0
 PKG_MAINTAINER:=JGG-SH
 PKGARCH:=all
@@ -34,7 +34,7 @@ define Package/luci-app-vocat/install
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/vocat
 	$(INSTALL_DATA) ./htdocs/luci-static/resources/view/vocat/index.js $(1)/www/luci-static/resources/view/vocat/index.js
 	$(INSTALL_DIR) $(1)/usr/share/vocat
-	echo "$(PKG_VERSION)" > $(1)/usr/share/vocat/plugin_version
+	echo "$(PKG_VERSION)-r$(PKG_RELEASE)" > $(1)/usr/share/vocat/plugin_version
 endef
 
 define Package/luci-app-vocat/postinst
