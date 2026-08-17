@@ -44,14 +44,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 读取界面版本号（从 Makefile）
+      - name: 计算版本号并写入 Makefile
         id: version
         run: |
-          PKG_VERSION=$(grep "^PKG_VERSION" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
-          PKG_RELEASE=$(grep "^PKG_RELEASE" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          PKG_VERSION="0.1"
+          PKG_RELEASE="${COMMIT_COUNT}"
           VERSION="${PKG_VERSION}-r${PKG_RELEASE}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "界面版本: ${VERSION}"
+          
+          sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=${PKG_RELEASE}/" Makefile
           
           SAFE_TARGET=$(echo "${{ github.event.inputs.target }}" | sed 's|/|-|g')
           echo "safe_target=${SAFE_TARGET}" >> $GITHUB_OUTPUT
