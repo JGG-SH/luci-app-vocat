@@ -44,21 +44,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 确定界面版本号和安全 target 名称
+      - name: 读取界面版本号（从 Makefile）
         id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/}"
-          else
-            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
-          fi
+          PKG_VERSION=$(grep "^PKG_VERSION" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
+          PKG_RELEASE=$(grep "^PKG_RELEASE" Makefile | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
+          VERSION="${PKG_VERSION}-r${PKG_RELEASE}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "界面版本: ${VERSION}"
           
-          # 将 target 中的 / 替换为 -，用于 artifact 名称
           SAFE_TARGET=$(echo "${{ github.event.inputs.target }}" | sed 's|/|-|g')
           echo "safe_target=${SAFE_TARGET}" >> $GITHUB_OUTPUT
-          echo "安全 target: ${SAFE_TARGET}"
 
       - name: 下载 SDK
         id: sdk
@@ -94,9 +90,6 @@ jobs:
           rsync -av --exclude='sdk' ./ sdk/package/luci-app-vocat/
           cd sdk
           echo "CONFIG_USE_APK=y" >> .config
-          if [ -f package/luci-app-vocat/Makefile ]; then
-            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${{ steps.version.outputs.version }}/" package/luci-app-vocat/Makefile
-          fi
           make defconfig
 
       - name: 编译 APK
@@ -115,9 +108,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          name: "luci-app-vocat v${{ steps.version.outputs.version }} (APK) for ${{ github.event.inputs.target }}"
+          name: "luci-app-vocat ${{ steps.version.outputs.version }} (APK) for ${{ github.event.inputs.target }}"
           body: |
-            ## luci-app-vocat v${{ steps.version.outputs.version }}
+            ## luci-app-vocat ${{ steps.version.outputs.version }}
             - 界面版本: ${{ steps.version.outputs.version }}
             - 核心版本: 编译时从 JGG-SH/VoCat 自动获取最新
             - 目标平台: ${{ github.event.inputs.target }}
